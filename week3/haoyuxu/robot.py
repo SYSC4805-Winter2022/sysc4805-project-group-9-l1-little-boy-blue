@@ -36,6 +36,12 @@ class Robot:
         returnCode, self.PlowLeftBarrierJoint = sim.simxGetObjectHandle(clientID,'PlowLeftBarrierJoint',sim.simx_opmode_blocking)
         returnCode, self.PlowRightJoint = sim.simxGetObjectHandle(clientID,'PlowRightJoint',sim.simx_opmode_blocking)
         returnCode, self.PlowRightBarrierJoint = sim.simxGetObjectHandle(clientID,'PlowRightBarrierJoint',sim.simx_opmode_blocking)
+        returnCode, self.ObjDetectSensorLeft = sim.simxGetObjectHandle(clientID, 'Proximity_sensor_left', sim.simx_opmode_blocking)
+        returnCode, self.ObjDetectSensorMiddle = sim.simxGetObjectHandle(clientID, 'Proximity_sensor_middle', sim.simx_opmode_blocking)
+        returnCode, self.ObjDetectSensorRight = sim.simxGetObjectHandle(clientID, 'Proximity_sensor_right', sim.simx_opmode_blocking)
+        returnCode, self.LineDetectSensorLeft = sim.simxGetObjectHandle(clientID, 'Line_Following_sensor_left', sim.simx_opmode_blocking)
+        returnCode, self.LineDetectSensorMiddle = sim.simxGetObjectHandle(clientID, 'Line_Following_sensor_middle', sim.simx_opmode_blocking)
+        returnCode, self.LineDetectSensorRight = sim.simxGetObjectHandle(clientID, 'Line_Following_sensor_right', sim.simx_opmode_blocking)
 
     def start(self):
         """
@@ -48,6 +54,7 @@ class Robot:
         robot.move_right(0.1)
         while 1:
             robot.get_orientation()
+            robot.get_line_following_sensor_data()
             time.sleep(0.1)
         return
 
@@ -114,6 +121,13 @@ class Robot:
         yaw = math.degrees(math.asin(2*x*y + 2*z*w))
 
         return yaw, pitch, roll
+
+    def get_line_following_sensor_data(self):
+        leftReturnCode, leftDetectionState, leftDetectedPoint, leftDetectedObjectHandle, leftDetectedSurfaceNormalVector = sim.simxReadProximitySensor(self.clientID, self.LineDetectSensorLeft, sim.simx_opmode_blocking)
+        middleReturnCode, middleDetectionState, middleDetectedPoint, middleDetectedObjectHandle, middleDetectedSurfaceNormalVector = sim.simxReadProximitySensor(self.clientID, self.LineDetectSensorMiddle, sim.simx_opmode_blocking)
+        rightReturnCode, rightDetectionState, rightDetectedPoint, rightDetectedObjectHandle, rightDetectedSurfaceNormalVector = sim.simxReadProximitySensor(self.clientID, self.LineDetectSensorRight, sim.simx_opmode_blocking)
+        print("LineDetection: Left=" + str(leftDetectionState) + ", Middle=" + str(middleDetectionState) + ", Right=" + str(rightDetectionState))
+        return (leftDetectionState, middleDetectionState, rightDetectionState)
 
 if __name__ == "__main__":
     print ('Program started')
