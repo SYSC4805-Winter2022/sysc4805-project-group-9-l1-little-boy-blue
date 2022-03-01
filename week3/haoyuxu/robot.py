@@ -115,6 +115,15 @@ class Robot:
         returnCode, quat = sim.simxGetObjectQuaternion(self.clientID,self.RobotBody,-1,sim.simx_opmode_blocking)
         x, y, z, w = quat
         print(self.quaternionToYawPitchRoll(x, y, z, w))
+    
+    def get_position(self):
+        """
+            x (index 0)
+            y (index 1)
+            z (index 2): dont look at it
+        """
+        returnCode, position = sim.simxGetObjectPosition(self.clientID,self.RobotBody,-1,sim.simx_opmode_blocking)
+        return position
 
     def quaternionToYawPitchRoll(self, x, y, z, w):
         roll = math.degrees(math.atan2(2*y*w - 2*x*z, 1 - 2*y*y - 2*z*z))
