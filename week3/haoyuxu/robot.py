@@ -20,8 +20,7 @@ except:
     print ('--------------------------------------------------------------')
     print ('')
 
-import time
-import math
+import math, time
 
 class Robot:
 
@@ -37,6 +36,20 @@ class Robot:
         returnCode, self.PlowLeftBarrierJoint = sim.simxGetObjectHandle(clientID,'PlowLeftBarrierJoint',sim.simx_opmode_blocking)
         returnCode, self.PlowRightJoint = sim.simxGetObjectHandle(clientID,'PlowRightJoint',sim.simx_opmode_blocking)
         returnCode, self.PlowRightBarrierJoint = sim.simxGetObjectHandle(clientID,'PlowRightBarrierJoint',sim.simx_opmode_blocking)
+
+    def start(self):
+        """
+            write your code here!
+        """
+        # robot.extend_plow()
+        # robot.retract_plow()
+        # robot.move_straight(2)
+        # robot.move_left(2)
+        robot.move_right(0.1)
+        while 1:
+            robot.get_orientation()
+            time.sleep(0.1)
+        return
 
     def extend_plow(self):
         sim.simxSetJointTargetPosition(self.clientID,self.PlowBaseJoint, 0.1,sim.simx_opmode_oneshot)
@@ -56,7 +69,7 @@ class Robot:
         """
             the diameter of the wheel is 0.2m
             maximum 2 m/s = 1146.4968152866 degrees/s
-            degree: to ensure the robot moves straight
+            the velocity in m/s
         """
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.LeftMotor,velocity,sim.simx_opmode_oneshot)
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.LeftMotor0,velocity,sim.simx_opmode_oneshot)
@@ -64,12 +77,18 @@ class Robot:
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.RightMotor0,velocity,sim.simx_opmode_oneshot)
 
     def move_right(self, velocity):
+        """
+            the velocity in m/s
+        """
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.LeftMotor,velocity,sim.simx_opmode_oneshot)
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.LeftMotor0,velocity,sim.simx_opmode_oneshot)
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.RightMotor,-velocity,sim.simx_opmode_oneshot)
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.RightMotor0,-velocity,sim.simx_opmode_oneshot)
 
     def move_left(self, velocity):
+        """
+            the velocity in m/s
+        """
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.LeftMotor,-velocity,sim.simx_opmode_oneshot)
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.LeftMotor0,-velocity,sim.simx_opmode_oneshot)
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.RightMotor,velocity,sim.simx_opmode_oneshot)
@@ -77,46 +96,24 @@ class Robot:
 
     def get_orientation(self):
         """
-            
+            roll (index 0): dont look at it
+            pitch (index 1): the orientation of the robot
+                   around -90: front
+                   around 90: back
+                   around -180/180: right
+                   around 0: left
+            yaw (index 2): dont look at it
         """
-        returnCode, orientation = sim.simxGetObjectOrientation(self.clientID,self.RobotBody,-1,sim.simx_opmode_blocking)
-        alpha, beta, gamma = orientation
-        # print(self.alphaBetaGammaToYawPitchRoll(alpha, beta, gamma))
-        print(orientation)
+        returnCode, quat = sim.simxGetObjectQuaternion(self.clientID,self.RobotBody,-1,sim.simx_opmode_blocking)
+        x, y, z, w = quat
+        print(self.quaternionToYawPitchRoll(x, y, z, w))
 
-    def alphaBetaGammaToYawPitchRoll(self, alpha, beta, gamma):
-        A = math.cos(alpha)
-        B = math.sin(alpha)
-        C = math.cos(beta)
-        D = math.sin(beta)
-        E = math.cos(gamma)
-        F = math.sin(gamma)
-        AD = A*D
-        BD = B*D
-        m = [
-            C*E,
-            -C*F,
-            D,
-            BD*E+A*F,
-            -BD*F+A*E,
-            -B*C,
-            AD*E+B*F,
-            AD*F+B*E,
-            A*C
-        ]
-        v = m[6]
-        if v > 1:
-            v = 1
-        elif v < -1:
-            v = -1
-        pitchAngle = math.asin(-v)
-        if abs(v) < 0.999999:
-            rollAngle=math.atan2(m[7],m[8])
-            yawAngle=math.atan2(m[3],m[0])
-        else:
-            rollAngle=math.atan2(-m[5],m[4])
-            yawAngle=0
-        return [yawAngle, pitchAngle, rollAngle]
+    def quaternionToYawPitchRoll(self, x, y, z, w):
+        roll = math.degrees(math.atan2(2*y*w - 2*x*z, 1 - 2*y*y - 2*z*z))
+        pitch = math.degrees(math.atan2(2*x*w - 2*y*z, 1 - 2*x*x - 2*z*z))
+        yaw = math.degrees(math.asin(2*x*y + 2*z*w))
+
+        return yaw, pitch, roll
 
 if __name__ == "__main__":
     print ('Program started')
@@ -127,14 +124,7 @@ if __name__ == "__main__":
 
         robot = Robot(clientID)
 
-        # robot.extend_plow()
-        # robot.retract_plow()
-        # robot.move_straight(2)
-        # robot.move_left(2)
-        robot.move_right(0.1)
-        while 1:
-            robot.get_orientation()
-            time.sleep(0.1)
+        robot.start()
 
         # Now send some data to CoppeliaSim in a non-blocking fashion:
         sim.simxAddStatusbarMessage(clientID,'Hello CoppeliaSim!',sim.simx_opmode_oneshot)
