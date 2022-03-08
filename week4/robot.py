@@ -20,9 +20,11 @@ except:
     print ('--------------------------------------------------------------')
     print ('')
 
-import math, time
+import math, time, inspect
 
 class Robot:
+
+    DEGREE_DIFFERENCE = 3
 
     def __init__(self, clientID) -> None:
         self.clientID = clientID
@@ -50,10 +52,15 @@ class Robot:
         # self.extend_plow()
         self.move_straight(2)
         time.sleep(2)
-        self.turn_left(90)
+        # self.turn_left(90)
+        # self.move_straight(2)
+        # time.sleep(2)
+        # self.turn_left(120)
+        # self.turn_left(120)
         self.move_straight(2)
         time.sleep(2)
-        self.turn_right(180)
+        # self.turn_right(100)
+        # time.sleep(2)
         # while 1:
         #     print(self.determine_orientation())
         #     time.sleep(0.1)
@@ -63,27 +70,31 @@ class Robot:
         """
             relative_orientation: the orientation the robot should be in after turning
         """
-        current_orientation = self.get_orientation()
-        self.stop()
-        self.move_left(2)
-        degree = current_orientation + relative_orientation
-        while not (self.__to_360(degree - 1) <= self.get_orientation() <= self.__to_360(degree + 1)):
-            continue
-        self.stop()
-        print(self.get_orientation())
+        degree = lambda current_orientation, relative_orientation: current_orientation + relative_orientation
+        self.__turn(relative_orientation, degree, self.move_left)
 
     def turn_right(self, relative_orientation):
         """
             relative_orientation: the orientation the robot should be in after turning
         """
+        degree = lambda current_orientation, relative_orientation: current_orientation - relative_orientation
+        self.__turn(relative_orientation, degree, self.move_right)
+
+    def __turn(self, relative_orientation, calc_func, direction_func):
         current_orientation = self.get_orientation()
         self.stop()
-        self.move_right(2)
-        degree = current_orientation - relative_orientation
-        while not (self.__to_360(degree - 1) <= self.get_orientation() <= self.__to_360(degree + 1)):
-            continue
+        degree = calc_func(current_orientation, relative_orientation)
+        min_degree = self.__to_360(degree - self.DEGREE_DIFFERENCE)
+        max_degree = self.__to_360(degree + self.DEGREE_DIFFERENCE)
+        direction_func(2)
+        if min_degree > max_degree:
+            while not (self.get_orientation() >= min_degree or self.get_orientation() <= max_degree):
+                continue
+        else:
+            while not (min_degree <= self.get_orientation() <= max_degree):
+                continue
         self.stop()
-        print(self.get_orientation())
+        print(inspect.stack()[1][3], self.get_orientation())
     
     def stop(self):
         self.move_straight(0)
@@ -97,7 +108,7 @@ class Robot:
         # block until the plow is extended
         while 1:
             returnCode, position = sim.simxGetJointPosition(self.clientID,self.PlowRightJoint,sim.simx_opmode_blocking)
-            if round(position, 0) >= 0.2:
+            if round(position, 1) >= 0.2:
                 return
 
     def retract_plow(self):
@@ -142,7 +153,7 @@ class Robot:
             pitch (index 1): the orientation of the robot
                    around 90: front
                    around 270: back
-                   acount180: left
+                   around 180: left
                    around 0: right
             yaw (index 2): dont look at it
         """
@@ -158,14 +169,14 @@ class Robot:
             z (index 2): dont look at it
         """
         returnCode, position = sim.simxGetObjectPosition(self.clientID,self.RobotBody,-1,sim.simx_opmode_blocking)
-        return round(position, 0)
+        return round(position, 1)
 
     def quaternionToYawPitchRoll(self, x, y, z, w):
         roll = math.degrees(math.atan2(2*y*w - 2*x*z, 1 - 2*y*y - 2*z*z))
         pitch = math.degrees(math.atan2(2*x*w - 2*y*z, 1 - 2*x*x - 2*z*z))
         yaw = math.degrees(math.asin(2*x*y + 2*z*w))
 
-        return round(yaw, 0), round(pitch, 0), round(roll, 0)
+        return round(yaw, 1), round(pitch, 1), round(roll, 1)
 
     def get_line_following_sensor_data(self):
         """
@@ -192,7 +203,7 @@ class Robot:
             degree += 360
         elif degree > 360:
             degree -= 360
-        return round(degree, 0)
+        return round(degree, 1)
 
 if __name__ == "__main__":
     print ('Program started')
