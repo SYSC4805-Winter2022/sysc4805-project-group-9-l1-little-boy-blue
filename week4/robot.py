@@ -20,7 +20,26 @@ except:
     print ('--------------------------------------------------------------')
     print ('')
 
-import math, time, inspect
+
+import inspect
+import math
+import time
+import enum
+import numpy as np
+
+
+class Direction(enum.Enum):
+    North = 1
+    East = 2
+    South = 3
+    West = 4
+
+
+class State(enum.Enum):
+    Beginning = 1
+    Pathing = 2
+    End = 3
+
 
 class Robot:
 
@@ -50,22 +69,69 @@ class Robot:
             write your code here!
         """
         # self.extend_plow()
-        self.move_straight(2)
+        self.move_straight(2.5)
         time.sleep(2)
-        # self.turn_left(90)
-        # self.move_straight(2)
-        # time.sleep(2)
-        # self.turn_left(120)
-        self.turn_right(120)
-        self.turn_left(90)
-        self.move_straight(2)
-        time.sleep(2)
-        # self.turn_right(100)
+        self.turn_right(90)
+        currDir = Direction.East
+        state = State.Beginning
+
+        while True:  # Main loop code, can be time dependent
+
+            _, _, _, _, middleDetectedPoint, _ = self.get_object_detection_sensor_data()
+
+            dist = np.linalg.norm(np.array(middleDetectedPoint))
+            print(dist)
+            # keeps detecting an object - fix
+            if dist < 10:
+                print("Object detected")
+                self.avoid_object()
+
+            self.move_straight(2)
+            middleReturnCode, middleDetectionState, auxPackets = self.get_line_following_sensor_data()
+
+            if middleDetectionState >= 0 and middleReturnCode == 0:
+                if auxPackets[0][11] < 0.5:
+                    print("mid_return\n", middleReturnCode)
+                    print("mid_state\n", middleDetectionState)
+                    print("mid_data\n", auxPackets[0][11])
+
+                    # E -> N once
+                    if currDir == Direction.East and state == State.Beginning:
+                        self.move_back(1)  # add check back sensor later
+                        time.sleep(1)
+                        self.turn_left(90)
+                        state = State.Pathing
+                        currDir = Direction.North
+
+                    # N -> W -> S
+                    elif currDir == Direction.North and state == State.Pathing:
+                        self.move_back(1)  # add check back sensor later
+                        self.turn_left(90)
+                        self.move_straight(1)
+                        self.turn_left(90)
+                        currDir = Direction.South
+
+                    # S -> W -> N
+                    elif currDir == Direction.South and state == State.Pathing:
+                        self.move_back(1)  # add check back sensor later
+                        self.turn_right(90)
+                        self.move_straight(1)
+                        self.turn_right(90)
+                        currDir = Direction.North
+
+                    # Detect end state
+
+        # leftDetectionState, middleDetectionState , rightDetectionState = self.get_line_following_sensor_data()
+        # while not (leftDetectionState or middleDetectionState or rightDetectionState):
+        #    self.move_straight(1)
         # time.sleep(2)
         # while 1:
         #     print(self.determine_orientation())
         #     time.sleep(0.1)
         return
+
+    def avoid_object(self):
+        pass
 
     def turn_left(self, relative_orientation):
         """
@@ -96,7 +162,7 @@ class Robot:
                 continue
         self.stop()
         print(inspect.stack()[1][3], self.get_orientation())
-    
+
     def stop(self):
         self.move_straight(0)
 
@@ -118,7 +184,16 @@ class Robot:
         sim.simxSetJointTargetPosition(self.clientID,self.PlowRightJoint, 0,sim.simx_opmode_oneshot)
         sim.simxSetJointTargetPosition(self.clientID,self.PlowLeftBarrierJoint, 0,sim.simx_opmode_oneshot)
         sim.simxSetJointTargetPosition(self.clientID,self.PlowRightBarrierJoint, 0,sim.simx_opmode_oneshot)
-    
+
+    def move_back(self, velocity):
+        """
+            the velocity in m/s
+        """
+        returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.LeftMotor,-velocity,sim.simx_opmode_blocking)
+        returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.LeftMotor0,-velocity,sim.simx_opmode_blocking)
+        returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.RightMotor,-velocity,sim.simx_opmode_blocking)
+        returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.RightMotor0,-velocity,sim.simx_opmode_blocking)
+
     def move_straight(self, velocity):
         """
             the diameter of the wheel is 0.2m
@@ -183,12 +258,12 @@ class Robot:
         """
             (left, middle, right)
         """
-        leftReturnCode, leftDetectionState, auxPackets = sim.simxReadVisionSensor(self.clientID, self.LineDetectSensorLeft, sim.simx_opmode_blocking)
-        middleReturnCode, middleDetectionState, auxPackets = sim.simxReadVisionSensor(self.clientID, self.LineDetectSensorMiddle, sim.simx_opmode_blocking)
-        rightReturnCode, rightDetectionState, auxPackets= sim.simxReadVisionSensor(self.clientID, self.LineDetectSensorRight, sim.simx_opmode_blocking)
-        print("LineDetection: Left=" + str(leftDetectionState) + ", Middle=" + str(middleDetectionState) + ", Right=" + str(rightDetectionState))
-        return (leftDetectionState, middleDetectionState, rightDetectionState)
-    
+        #leftReturnCode, leftDetectionState, auxPackets = sim.simxReadVisionSensor(self.clientID, self.LineDetectSensorLeft, sim.simx_opmode_blocking)
+        middleReturnCode, middleDetectionState, auxPackets = sim.simxReadVisionSensor(self.clientID, self.LineDetectSensorMiddle, sim.simx_opmode_streaming)
+        #rightReturnCode, rightDetectionState, auxPackets= sim.simxReadVisionSensor(self.clientID, self.LineDetectSensorRight, sim.simx_opmode_blocking)
+        #print("LineDetection: Left=" + str(leftDetectionState) + ", Middle=" + str(middleDetectionState) + ", Right=" + str(rightDetectionState))
+        return middleReturnCode, middleDetectionState, auxPackets
+
     def get_object_detection_sensor_data(self):
         """
             (left, middle, right)
@@ -196,8 +271,9 @@ class Robot:
         leftReturnCode, leftDetectionState, leftDetectedPoint, leftDetectedObjectHandle, leftDetectedSurfaceNormalVector = sim.simxReadProximitySensor(self.clientID, self.ObjDetectSensorLeft, sim.simx_opmode_streaming)
         middleReturnCode, middleDetectionState, middleDetectedPoint, middleDetectedObjectHandle, middleDetectedSurfaceNormalVector = sim.simxReadProximitySensor(self.clientID, self.ObjDetectSensorMiddle, sim.simx_opmode_streaming)
         rightReturnCode, rightDetectionState, rightDetectedPoint, rightDetectedObjectHandle, rightDetectedSurfaceNormalVector = sim.simxReadProximitySensor(self.clientID, self.ObjDetectSensorRight, sim.simx_opmode_streaming)
-        print("ObjDetection: Left=" + str(leftDetectionState) + ", Middle=" + str(middleDetectionState) + ", Right=" + str(rightDetectionState))
-        return (leftDetectionState, middleDetectionState, rightDetectionState)
+        #print("ObjDetection: Left=" + str(leftDetectionState) + ", Middle=" + str(middleDetectionState) + ", Right=" + str(rightDetectionState))
+        #print(leftDetectedPoint, middleDetectedPoint, rightDetectedPoint)
+        return leftDetectionState, middleDetectionState, rightDetectionState, leftDetectedPoint, middleDetectedPoint, rightDetectedPoint
 
     def __to_360(self, degree):
         if degree < 0:
@@ -205,6 +281,7 @@ class Robot:
         elif degree > 360:
             degree -= 360
         return round(degree, 1)
+
 
 if __name__ == "__main__":
     print ('Program started')
