@@ -21,6 +21,7 @@ except:
     print ('')
 
 import math, time, inspect
+from turtle import pos
 
 class Robot:
 
@@ -49,23 +50,50 @@ class Robot:
         """
             write your code here!
         """
-        # self.extend_plow()
-        self.move_straight(2)
-        time.sleep(2)
+        self.extend_plow()
+        while not self.is_plow_(extended=True):
+            continue
+        # self.move_straight(2)
+        # time.sleep(0.5)
+        self.turn_right(170)
+        self.turn_to(180)
         # self.turn_left(90)
         # self.move_straight(2)
         # time.sleep(2)
         # self.turn_left(120)
-        self.turn_right(120)
-        self.turn_left(90)
-        self.move_straight(2)
-        time.sleep(2)
+        # self.turn_left(90)
+        # self.move_straight(2)
+        # time.sleep(2)
         # self.turn_right(100)
+        # time.sleep(2)
+        # self.move_straight(2)
         # time.sleep(2)
         # while 1:
         #     print(self.determine_orientation())
         #     time.sleep(0.1)
         return
+
+    def turn_to(self, degree):
+        current_orientation = self.get_orientation()
+        quadrant = current_orientation // 90
+        if quadrant == 0 or quadrant == 1:
+            if current_orientation <= degree <= current_orientation + 180:
+                self.turn_left(degree - current_orientation)
+            else:
+                if current_orientation > degree:
+                    _degree = current_orientation - degree
+                else:
+                    _degree = 360 - current_orientation + degree
+                self.turn_right(_degree)
+        elif quadrant == 2 or quadrant == 3:
+            if current_orientation - 180 <= degree <= current_orientation:
+                self.turn_right(current_orientation - degree)
+            else:
+                if degree > current_orientation:
+                    _degree= degree - current_orientation
+                else:
+                    _degree = 360 - current_orientation + degree
+                self.turn_left(_degree)
 
     def turn_left(self, relative_orientation):
         """
@@ -104,13 +132,8 @@ class Robot:
         sim.simxSetJointTargetPosition(self.clientID,self.PlowBaseJoint, 0.1,sim.simx_opmode_oneshot)
         sim.simxSetJointTargetPosition(self.clientID,self.PlowLeftJoint, -0.2,sim.simx_opmode_oneshot)
         sim.simxSetJointTargetPosition(self.clientID,self.PlowRightJoint, 0.2,sim.simx_opmode_oneshot)
-        sim.simxSetJointTargetPosition(self.clientID,self.PlowLeftBarrierJoint, 0.1,sim.simx_opmode_oneshot)
-        sim.simxSetJointTargetPosition(self.clientID,self.PlowRightBarrierJoint, 0.1, sim.simx_opmode_oneshot)
-        # block until the plow is extended
-        while 1:
-            returnCode, position = sim.simxGetJointPosition(self.clientID,self.PlowRightJoint,sim.simx_opmode_blocking)
-            if round(position, 1) >= 0.2:
-                return
+        sim.simxSetJointTargetPosition(self.clientID,self.PlowLeftBarrierJoint, 0.09,sim.simx_opmode_oneshot)
+        sim.simxSetJointTargetPosition(self.clientID,self.PlowRightBarrierJoint, 0.09, sim.simx_opmode_oneshot)
 
     def retract_plow(self):
         sim.simxSetJointTargetPosition(self.clientID,self.PlowBaseJoint, 0,sim.simx_opmode_oneshot)
@@ -118,6 +141,23 @@ class Robot:
         sim.simxSetJointTargetPosition(self.clientID,self.PlowRightJoint, 0,sim.simx_opmode_oneshot)
         sim.simxSetJointTargetPosition(self.clientID,self.PlowLeftBarrierJoint, 0,sim.simx_opmode_oneshot)
         sim.simxSetJointTargetPosition(self.clientID,self.PlowRightBarrierJoint, 0,sim.simx_opmode_oneshot)
+    
+    def retract_barrier(self):
+        sim.simxSetJointTargetPosition(self.clientID,self.PlowLeftBarrierJoint, 0,sim.simx_opmode_oneshot)
+        sim.simxSetJointTargetPosition(self.clientID,self.PlowRightBarrierJoint, 0,sim.simx_opmode_oneshot)
+
+    def extend_barrier(self):
+        sim.simxSetJointTargetPosition(self.clientID,self.PlowLeftBarrierJoint, 0.1,sim.simx_opmode_oneshot)
+        sim.simxSetJointTargetPosition(self.clientID,self.PlowRightBarrierJoint, 0.1,sim.simx_opmode_oneshot)
+
+    def is_plow_(self, extended=False, retracted=False):
+        returnCode, position = sim.simxGetJointPosition(self.clientID,self.PlowRightJoint,sim.simx_opmode_blocking)
+        position = round(position, 1)
+        if extended:
+            return position >= 0.2
+        if retracted:
+            return position <= 0
+        return False
     
     def move_straight(self, velocity):
         """
