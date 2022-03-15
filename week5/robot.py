@@ -25,14 +25,13 @@ import inspect
 import math
 import time
 import enum
-import numpy as np
 
 
 class Direction(enum.Enum):
-    North = 1
-    East = 2
-    South = 3
-    West = 4
+    North = 90
+    East = 0
+    South = 180
+    West = 270
 
 
 class State(enum.Enum):
@@ -72,54 +71,50 @@ class Robot:
         while not self.is_plow_(extended=True):
             continue
         self.move_straight(2.5)
-        time.sleep(2)
-        self.turn_right(90)
-        currDir = Direction.East
-        state = State.Beginning
-
+        time.sleep(2.5)
+        self.turn_to(0)
+        self.currDir = Direction.East
+        self.state = State.Beginning
+        # print(self.get_position())
         while True:  # Main loop code, can be time dependent
-
-            _, _, _, _, middleDetectedPoint, _ = self.get_object_detection_sensor_data()
-
-            dist = np.linalg.norm(np.array(middleDetectedPoint))
-            print(dist)
-            # keeps detecting an object - fix
-            if dist < 10:
+            # print(self.get_position())
+            _, middleDetectionState, _, _, middleDetectedPoint, _ = self.get_object_detection_sensor_data()
+            dist = round(middleDetectedPoint[2], 3)
+            if 0 < dist < 0.5 and middleDetectionState:
                 print("Object detected")
                 self.avoid_object()
-
             self.move_straight(2)
             middleReturnCode, middleDetectionState, auxPackets = self.get_line_following_sensor_data()
 
             if middleDetectionState >= 0 and middleReturnCode == 0:
                 if auxPackets[0][11] < 0.5:
-                    print("mid_return\n", middleReturnCode)
-                    print("mid_state\n", middleDetectionState)
-                    print("mid_data\n", auxPackets[0][11])
+                    # print("mid_return\n", middleReturnCode)
+                    # print("mid_state\n", middleDetectionState)
+                    # print("mid_data\n", auxPackets[0][11])
 
                     # E -> N once
-                    if currDir == Direction.East and state == State.Beginning:
+                    if self.currDir == Direction.East and self.state == State.Beginning:
                         self.move_back(1)  # add check back sensor later
                         time.sleep(1)
-                        self.turn_left(90)
-                        state = State.Pathing
-                        currDir = Direction.North
+                        self.turn_to(90)
+                        self.state = State.Pathing
+                        self.currDir = Direction.North
 
                     # N -> W -> S
-                    elif currDir == Direction.North and state == State.Pathing:
+                    elif self.currDir == Direction.North and self.state == State.Pathing:
                         self.move_back(1)  # add check back sensor later
-                        self.turn_left(90)
+                        self.turn_to(180)
                         self.move_straight(1)
-                        self.turn_left(90)
-                        currDir = Direction.South
+                        self.turn_to(270)
+                        self.currDir = Direction.South
 
                     # S -> W -> N
-                    elif currDir == Direction.South and state == State.Pathing:
+                    elif self.currDir == Direction.South and self.state == State.Pathing:
                         self.move_back(1)  # add check back sensor later
-                        self.turn_right(90)
+                        self.turn_to(180)
                         self.move_straight(1)
-                        self.turn_right(90)
-                        currDir = Direction.North
+                        self.turn_to(90)
+                        self.currDir = Direction.North
 
                     # Detect end state
 
@@ -133,7 +128,20 @@ class Robot:
         return
 
     def avoid_object(self):
-        pass
+        init_position = self.get_position()
+        is_detected = True
+        while is_detected:
+            self.turn_to(180)
+            self.move_straight(2)
+            _, _, rightDetectedState, _, _, rightDetectedPoint = self.get_object_detection_sensor_data()
+            if round(rightDetectedPoint[2], 1) == 0 and not rightDetectedState:
+                is_detected = False
+                avoided_position = self.get_position()
+                print("Object avoided")
+        self.turn_to(90)
+        self.move_straight(2)
+        delta_position = (init_position[0] - avoided_position[0], init_position[1] - avoided_position[1])
+        print("Delta position: ", delta_position)
 
     def turn_to(self, degree):
         current_orientation = self.get_orientation()
@@ -281,7 +289,7 @@ class Robot:
             z (index 2): dont look at it
         """
         returnCode, position = sim.simxGetObjectPosition(self.clientID,self.RobotBody,-1,sim.simx_opmode_blocking)
-        return round(position, 1)
+        return (round(position[0], 1), round(position[1], 1))
 
     def quaternionToYawPitchRoll(self, x, y, z, w):
         roll = math.degrees(math.atan2(2*y*w - 2*x*z, 1 - 2*y*y - 2*z*z))
