@@ -70,9 +70,11 @@ class Robot:
         self.extend_plow()
         while not self.is_plow_(extended=True):
             continue
-        self.move_straight(2.5)
-        time.sleep(2.5)
-        self.turn_to(0)
+        self.move_straight(1.5)
+        current_x, current_y = self.get_position()
+        while current_y < (-6.25 + 1):
+            current_x, current_y = self.get_position()
+        self.turn_to(Direction.East.value)
         self.currDir = Direction.East
         self.state = State.Beginning
         # print(self.get_position())
@@ -80,10 +82,10 @@ class Robot:
             # print(self.get_position())
             _, middleDetectionState, _, _, middleDetectedPoint, _ = self.get_object_detection_sensor_data()
             dist = round(middleDetectedPoint[2], 3)
-            if 0 < dist < 0.5 and middleDetectionState:
+            if 0 < dist < 1 and middleDetectionState:
                 print("Object detected")
                 self.avoid_object()
-            self.move_straight(2)
+            self.move_straight(1)
             middleReturnCode, middleDetectionState, auxPackets = self.get_line_following_sensor_data()
 
             if middleDetectionState >= 0 and middleReturnCode == 0:
@@ -94,26 +96,28 @@ class Robot:
 
                     # E -> N once
                     if self.currDir == Direction.East and self.state == State.Beginning:
-                        self.move_back(1)  # add check back sensor later
+                        self.move_back(0.5)  # add check back sensor later
                         time.sleep(1)
-                        self.turn_to(90)
+                        self.turn_to(Direction.North.value)
                         self.state = State.Pathing
                         self.currDir = Direction.North
 
                     # N -> W -> S
                     elif self.currDir == Direction.North and self.state == State.Pathing:
-                        self.move_back(1)  # add check back sensor later
-                        self.turn_to(180)
-                        self.move_straight(1)
-                        self.turn_to(270)
+                        self.move_back(0.5)  # add check back sensor later
+                        self.turn_to(Direction.West.value)
+                        self.move_straight(0.5)
+                        time.sleep(1)
+                        self.turn_to(Direction.South.value)
                         self.currDir = Direction.South
 
                     # S -> W -> N
                     elif self.currDir == Direction.South and self.state == State.Pathing:
-                        self.move_back(1)  # add check back sensor later
-                        self.turn_to(180)
-                        self.move_straight(1)
-                        self.turn_to(90)
+                        self.move_back(0.5)  # add check back sensor later
+                        self.turn_to(Direction.West.value)
+                        self.move_straight(0.5)
+                        self.turn_to(Direction.North.value)
+                        time.sleep(1)
                         self.currDir = Direction.North
 
                     # Detect end state
@@ -130,16 +134,16 @@ class Robot:
     def avoid_object(self):
         init_position = self.get_position()
         is_detected = True
+        self.turn_to(180)
         while is_detected:
-            self.turn_to(180)
-            self.move_straight(2)
+            self.move_straight(0.5)
             _, _, rightDetectedState, _, _, rightDetectedPoint = self.get_object_detection_sensor_data()
             if round(rightDetectedPoint[2], 1) == 0 and not rightDetectedState:
                 is_detected = False
                 avoided_position = self.get_position()
                 print("Object avoided")
         self.turn_to(90)
-        self.move_straight(2)
+        self.move_straight(0.5)
         delta_position = (init_position[0] - avoided_position[0], init_position[1] - avoided_position[1])
         print("Delta position: ", delta_position)
 
@@ -170,6 +174,7 @@ class Robot:
             relative_orientation: the orientation the robot should be in after turning
         """
         degree = lambda current_orientation, relative_orientation: current_orientation + relative_orientation
+        print(inspect.stack()[0][3], self.get_orientation())
         self.__turn(relative_orientation, degree, self.move_left)
 
     def turn_right(self, relative_orientation):
@@ -185,7 +190,7 @@ class Robot:
         degree = calc_func(current_orientation, relative_orientation)
         min_degree = self.__to_360(degree - self.DEGREE_DIFFERENCE)
         max_degree = self.__to_360(degree + self.DEGREE_DIFFERENCE)
-        direction_func(2)
+        direction_func(0.1)
         if min_degree > max_degree:
             while not (self.get_orientation() >= min_degree or self.get_orientation() <= max_degree):
                 continue
@@ -233,6 +238,7 @@ class Robot:
         """
             the velocity in m/s
         """
+        velocity *= 10
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.LeftMotor,-velocity,sim.simx_opmode_blocking)
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.LeftMotor0,-velocity,sim.simx_opmode_blocking)
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.RightMotor,-velocity,sim.simx_opmode_blocking)
@@ -244,6 +250,7 @@ class Robot:
             maximum 2 m/s = 1146.4968152866 degrees/s
             the velocity in m/s
         """
+        velocity *= 10
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.LeftMotor,velocity,sim.simx_opmode_oneshot)
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.LeftMotor0,velocity,sim.simx_opmode_oneshot)
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.RightMotor,velocity,sim.simx_opmode_oneshot)
@@ -253,15 +260,17 @@ class Robot:
         """
             the velocity in m/s
         """
+        velocity *= 10
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.LeftMotor,velocity,sim.simx_opmode_oneshot)
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.LeftMotor0,velocity,sim.simx_opmode_oneshot)
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.RightMotor,-velocity,sim.simx_opmode_oneshot)
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.RightMotor0,-velocity,sim.simx_opmode_oneshot)
-
+    
     def move_left(self, velocity):
         """
             the velocity in m/s
         """
+        velocity *= 10
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.LeftMotor,-velocity,sim.simx_opmode_oneshot)
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.LeftMotor0,-velocity,sim.simx_opmode_oneshot)
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.RightMotor,velocity,sim.simx_opmode_oneshot)
