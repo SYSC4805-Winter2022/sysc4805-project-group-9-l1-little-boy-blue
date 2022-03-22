@@ -27,10 +27,10 @@ import enum
 
 
 class Direction(enum.Enum):
-    North = 90
-    East = 0
-    South = 270
-    West = 180
+    North = 0
+    East = 270
+    South = 180
+    West = 90
 
 
 class State(enum.Enum):
@@ -82,7 +82,7 @@ class Robot:
             # print(self.get_position())
             _, middleDetectionState, _, _, middleDetectedPoint, _ = self.get_object_detection_sensor_data()
             dist = round(middleDetectedPoint[2], 3)
-            if 0 < dist < 1 and middleDetectionState:
+            if 0 < dist < 0.8 and middleDetectionState:
                 print("Object detected")
                 self.avoid_object()
             self.move_straight(self.MOVE_STRAIGHT_SPEED)
@@ -229,7 +229,7 @@ class Robot:
                 if current_orientation > degree:
                     _degree = current_orientation - degree
                 else:
-                    _degree = 360 - current_orientation + degree
+                    _degree = 360 - degree + current_orientation
                 self.turn_right(_degree)
         elif quadrant == 2 or quadrant == 3:
             if current_orientation - 180 <= degree <= current_orientation:
@@ -357,9 +357,9 @@ class Robot:
                    around 0: right
             yaw (index 2): dont look at it
         """
-        returnCode, quat = sim.simxGetObjectQuaternion(self.clientID,self.RobotBody,-1,sim.simx_opmode_blocking)
-        x, y, z, w = quat
-        _, degree, __ = self.quaternionToYawPitchRoll(x, y, z, w)
+        returnCode, euler = sim.simxGetObjectOrientation(self.clientID,self.RobotBody,-1,sim.simx_opmode_blocking)
+        _, __, degree = math.degrees(euler[0]), math.degrees(euler[1]), math.degrees(euler[2])
+        # degree, _, __ = self.quaternionToYawPitchRoll(x, y, z, w)
         return self.__to_360(degree)
 
     def get_position(self):
