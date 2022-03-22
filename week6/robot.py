@@ -64,6 +64,7 @@ class Robot:
         returnCode, self.LineDetectSensorLeft = sim.simxGetObjectHandle(clientID, 'Line_Following_sensor_left', sim.simx_opmode_blocking)
         returnCode, self.LineDetectSensorMiddle = sim.simxGetObjectHandle(clientID, 'Line_Following_sensor_middle', sim.simx_opmode_blocking)
         returnCode, self.LineDetectSensorRight = sim.simxGetObjectHandle(clientID, 'Line_Following_sensor_right', sim.simx_opmode_blocking)
+        returnCode, self.RightBackSensor = sim.simxGetObjectHandle(clientID, 'Right_back_sensor', sim.simx_opmode_blocking)
         self.currDir = Direction.North
 
     def start(self):
@@ -77,14 +78,14 @@ class Robot:
         self.turn_to(Direction.East.value)
         self.currDir = Direction.East
         self.state = State.Beginning
-        # print(self.get_position())
+        print(self.get_position())
         while True:  # Main loop code, can be time dependent
             # print(self.get_position())
             _, middleDetectionState, _, _, middleDetectedPoint, _ = self.get_object_detection_sensor_data()
             dist = round(middleDetectedPoint[2], 3)
             if 0 < dist < 0.8 and middleDetectionState:
                 print("Object detected")
-                self.avoid_object()
+                self.avoid_object(self.currDir)
             self.move_straight(self.MOVE_STRAIGHT_SPEED)
             middleReturnCode, middleDetectionState, auxPackets = self.get_line_following_sensor_data()
 
@@ -93,9 +94,9 @@ class Robot:
                     # print("mid_return\n", middleReturnCode)
                     # print("mid_state\n", middleDetectionState)
                     # print("mid_data\n", auxPackets[0][11])
-
                     # E -> N once
                     if self.currDir == Direction.East and self.state == State.Beginning:
+                        print("E -> N")
                         # changing x
                         self.move_to(x=self.BACKING_DISPLACEMENT)
                         self.turn_to(Direction.North.value)
@@ -104,6 +105,7 @@ class Robot:
 
                     # N -> W -> S
                     elif self.currDir == Direction.North and self.state == State.Pathing:
+                        print("N -> W -> S")
                         # changing y
                         self.move_to(y=self.BACKING_DISPLACEMENT)
                         self.turn_to(Direction.West.value)
@@ -115,6 +117,7 @@ class Robot:
 
                     # S -> W -> N
                     elif self.currDir == Direction.South and self.state == State.Pathing:
+                        print("S -> W -> N")
                         self.move_to(y=self.BACKING_DISPLACEMENT)
                         self.turn_to(Direction.West.value)
                         self.currDir = Direction.West
@@ -133,7 +136,7 @@ class Robot:
         #     time.sleep(0.1)
         return
 
-    def avoid_object(self):
+    def avoid_object(self, curr_dir):
         """
             TODO: what if blackline is detected?
             TODO: go back to nav point
@@ -151,22 +154,44 @@ class Robot:
                 is_detected = False
                 avoided_position = self.get_position()
                 print("Object avoided")
-        self.turn_to(self.currDir.value)
-        self.move_straight(self.MOVE_STRAIGHT_SPEED)
-        _x = init_position[0] - avoided_position[0]
-        _y = init_position[1] - avoided_position[1]
-        if -0.5 < _x < 0.5:
-            _x = 0
-        if -0.5 < _y < 0.5:
-            _y = 0
-        delta_position = (_x, _y)
-        self.navigate_to(delta_position)
+        # self.turn_to(self.currDir.value)
+        # self.move_straight(self.MOVE_STRAIGHT_SPEED)
+        # _x = init_position[0] - avoided_position[0]
+        # _y = init_position[1] - avoided_position[1]
+        # if -0.5 < _x < 0.5:
+        #     _x = 0
+        # if -0.5 < _y < 0.5:
+        #     _y = 0
+        # delta_position = (_x, _y)
+        self.navigate_back(init_position, avoided_position, curr_dir)
 
-    def navigate_to(self, point):
+    def navigate_back(self, initial_pos, avoided_pos, prev_dir):
         """
             navigate to a point
         """
-        print("Delta position: ", point)
+
+        print("Initial", initial_pos)
+        print("Avoided", avoided_pos)
+        print("curr_dir", prev_dir)
+
+        leftDetectedState, _, rightDetectedState, leftDetectedPoint, _, rightDetectedPoint = self.get_object_detection_sensor_data()
+
+        if prev_dir == Direction.North:
+            self.turn_to(Direction.North.value)
+            self.move_to(y=1)
+            _, right_back_sensor, _, _, _ = sim.simxReadProximitySensor(self.clientID, self.RightBackSensor, sim.simx_opmode_streaming)
+            print(right_back_sensor)
+            while right_back_sensor:
+                print("in")
+                leftDetectedState, _, rightDetectedState, leftDetectedPoint, _, rightDetectedPoint = self.get_object_detection_sensor_data()
+                self.move_straight(self.MOVE_STRAIGHT_SPEED)
+            print("out")
+            self.turn_to(Direction.East.value)
+            self.move_straight(initial_pos[0]-avoided_pos[0])
+
+            return
+
+        #print("Delta position: ", point)
         # if self.currDir == Direction.North or self.currDir == Direction.South:
         #     self.turn_to(Direction.East.value)
         # elif self.currDir == Direction.East or self.currDir == Direction.West:
