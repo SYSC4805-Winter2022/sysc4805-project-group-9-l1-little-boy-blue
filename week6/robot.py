@@ -25,26 +25,25 @@ import inspect
 import math
 import enum
 
-
 class Direction(enum.Enum):
     North = 0
     East = 270
     South = 180
     West = 90
 
-
 class State(enum.Enum):
     Beginning = 1
     Pathing = 2
     End = 3
 
-
 class Robot:
 
     DEGREE_DIFFERENCE = 3
     BACKING_DISPLACEMENT = -0.02
-    FORWARD_DISPLACEMENT = 0.5
-    MOVE_STRAIGHT_SPEED = 1
+    FORWARD_DISPLACEMENT = 0.7
+    MOVE_STRAIGHT_SPEED = 1.2
+    AVOID_OBJECT_DISPLACEMENT = 1
+    TUNRING_SPEED = 0.1
 
     def __init__(self, clientID) -> None:
         self.clientID = clientID
@@ -76,16 +75,15 @@ class Robot:
         self.extend_plow()
         while not self.is_plow_(extended=True):
             continue
-        self.move_to(y=self.FORWARD_DISPLACEMENT * 2)
+        self.move_to(y=1)
         self.turn_to(Direction.East.value)
         self.currDir = Direction.East
         self.state = State.Beginning
         print(self.get_position())
         while True:  # Main loop code, can be time dependent
             # print(self.get_position())
-            _, middleDetectionState, _, _, middleDetectedPoint, _ = self.get_object_detection_sensor_data()
-            dist = round(middleDetectedPoint[2], 3)
-            if 0 < dist < 0.8 and middleDetectionState:
+            _, middleDetectionState, _, _, _, _ = self.get_object_detection_sensor_data()
+            if middleDetectionState:
                 print("Object detected")
                 self.avoid_object()
             self.move_straight(self.MOVE_STRAIGHT_SPEED)
@@ -165,25 +163,26 @@ class Robot:
         # if -0.5 < _y < 0.5:
         #     _y = 0
         # delta_position = (_x, _y)
-        self.navigate_back(init_position, avoided_position, self.currDir)
+        self.navigate_back(init_position, avoided_position)
 
-    def navigate_back(self, initial_pos, avoided_pos, prev_dir):
+    def navigate_back(self, initial_pos, avoided_pos):
         """
             navigate to a point
         """
-
+        prev_dir = self.currDir
         print("Initial", initial_pos)
         print("Avoided", avoided_pos)
         print("curr_dir", prev_dir)
 
-        leftDetectedState, _, rightDetectedState, leftDetectedPoint, _, rightDetectedPoint = self.get_object_detection_sensor_data()
         if prev_dir == Direction.North:
             self.turn_to(Direction.North.value)
-            self.move_to(y=1)
-            left_back_detection_state, left_back_detected_point, right_back_detection_state, right_back_detected_point = self.get_laser_data()
+            self.move_to(y=self.AVOID_OBJECT_DISPLACEMENT)
+            left_back_detection_state, _, right_back_detection_state, _ = self.get_laser_data()
+            _, _, rightDetectionState, _, _, _ = self.get_object_detection_sensor_data()
             self.move_straight(self.MOVE_STRAIGHT_SPEED)
-            while right_back_detection_state:
-                left_back_detection_state, left_back_detected_point, right_back_detection_state, right_back_detected_point = self.get_laser_data()
+            while right_back_detection_state or rightDetectionState:
+                left_back_detection_state, _, right_back_detection_state, _ = self.get_laser_data()
+                _, _, rightDetectionState, _, _, _ = self.get_object_detection_sensor_data()
             print("out")
             self.turn_to(Direction.East.value)
             self.currDir = Direction.East
@@ -192,7 +191,23 @@ class Robot:
             self.turn_to(Direction.North.value)
             self.currDir = Direction.North
             return
-
+        elif prev_dir == Direction.South:
+            self.turn_to(Direction.South.value)
+            self.move_to(y=self.AVOID_OBJECT_DISPLACEMENT)
+            left_back_detection_state, _, right_back_detection_state, _ = self.get_laser_data()
+            leftDetectedState, _, rightDetectionState, _, _, _ = self.get_object_detection_sensor_data()
+            self.move_straight(self.MOVE_STRAIGHT_SPEED)
+            while left_back_detection_state or leftDetectedState:
+                left_back_detection_state, _, right_back_detection_state, _ = self.get_laser_data()
+                leftDetectedState, _, rightDetectionState, _, _, _ = self.get_object_detection_sensor_data()
+            print("out")
+            self.turn_to(Direction.East.value)
+            self.currDir = Direction.East
+            self.move_to(x=initial_pos[0]-avoided_pos[0])
+            # back to nav point
+            self.turn_to(Direction.South.value)
+            self.currDir = Direction.South
+            return
         #print("Delta position: ", point)
         # if self.currDir == Direction.North or self.currDir == Direction.South:
         #     self.turn_to(Direction.East.value)
@@ -288,7 +303,7 @@ class Robot:
         degree = calc_func(current_orientation, relative_orientation)
         min_degree = self.__to_360(degree - self.DEGREE_DIFFERENCE)
         max_degree = self.__to_360(degree + self.DEGREE_DIFFERENCE)
-        direction_func(0.1)
+        direction_func(self.TUNRING_SPEED)
         if min_degree > max_degree:
             while not (self.get_orientation() >= min_degree or self.get_orientation() <= max_degree):
                 continue
