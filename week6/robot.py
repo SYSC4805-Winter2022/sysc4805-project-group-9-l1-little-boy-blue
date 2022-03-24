@@ -65,12 +65,14 @@ class Robot:
         returnCode, self.LineDetectSensorMiddle = sim.simxGetObjectHandle(clientID, 'Line_Following_sensor_middle', sim.simx_opmode_blocking)
         returnCode, self.LineDetectSensorRight = sim.simxGetObjectHandle(clientID, 'Line_Following_sensor_right', sim.simx_opmode_blocking)
         returnCode, self.RightBackSensor = sim.simxGetObjectHandle(clientID, 'Right_back_sensor', sim.simx_opmode_blocking)
+        returnCode, self.LeftBackSensor = sim.simxGetObjectHandle(clientID, 'Left_back_sensor', sim.simx_opmode_blocking)
         self.currDir = Direction.North
 
     def start(self):
         """
             write your code here!
         """
+        self.init_sensors()
         self.extend_plow()
         while not self.is_plow_(extended=True):
             continue
@@ -85,7 +87,7 @@ class Robot:
             dist = round(middleDetectedPoint[2], 3)
             if 0 < dist < 0.8 and middleDetectionState:
                 print("Object detected")
-                self.avoid_object(self.currDir)
+                self.avoid_object()
             self.move_straight(self.MOVE_STRAIGHT_SPEED)
             middleReturnCode, middleDetectionState, auxPackets = self.get_line_following_sensor_data()
 
@@ -136,7 +138,7 @@ class Robot:
         #     time.sleep(0.1)
         return
 
-    def avoid_object(self, curr_dir):
+    def avoid_object(self):
         """
             TODO: what if blackline is detected?
             TODO: go back to nav point
@@ -163,7 +165,7 @@ class Robot:
         # if -0.5 < _y < 0.5:
         #     _y = 0
         # delta_position = (_x, _y)
-        self.navigate_back(init_position, avoided_position, curr_dir)
+        self.navigate_back(init_position, avoided_position, self.currDir)
 
     def navigate_back(self, initial_pos, avoided_pos, prev_dir):
         """
@@ -175,20 +177,20 @@ class Robot:
         print("curr_dir", prev_dir)
 
         leftDetectedState, _, rightDetectedState, leftDetectedPoint, _, rightDetectedPoint = self.get_object_detection_sensor_data()
-
         if prev_dir == Direction.North:
             self.turn_to(Direction.North.value)
             self.move_to(y=1)
-            _, right_back_sensor, _, _, _ = sim.simxReadProximitySensor(self.clientID, self.RightBackSensor, sim.simx_opmode_streaming)
-            print(right_back_sensor)
-            while right_back_sensor:
-                print("in")
-                leftDetectedState, _, rightDetectedState, leftDetectedPoint, _, rightDetectedPoint = self.get_object_detection_sensor_data()
-                self.move_straight(self.MOVE_STRAIGHT_SPEED)
+            left_back_detection_state, left_back_detected_point, right_back_detection_state, right_back_detected_point = self.get_laser_data()
+            self.move_straight(self.MOVE_STRAIGHT_SPEED)
+            while right_back_detection_state:
+                left_back_detection_state, left_back_detected_point, right_back_detection_state, right_back_detected_point = self.get_laser_data()
             print("out")
             self.turn_to(Direction.East.value)
-            self.move_straight(initial_pos[0]-avoided_pos[0])
-
+            self.currDir = Direction.East
+            self.move_to(x=initial_pos[0]-avoided_pos[0])
+            # back to nav point
+            self.turn_to(Direction.North.value)
+            self.currDir = Direction.North
             return
 
         #print("Delta position: ", point)
@@ -413,16 +415,28 @@ class Robot:
         #print("LineDetection: Left=" + str(leftDetectionState) + ", Middle=" + str(middleDetectionState) + ", Right=" + str(rightDetectionState))
         return middleReturnCode, middleDetectionState, auxPackets
 
+    def init_sensors(self):
+        _, _, _, _, _ = sim.simxReadProximitySensor(self.clientID, self.ObjDetectSensorLeft, sim.simx_opmode_streaming)
+        _, _, _, _, _ = sim.simxReadProximitySensor(self.clientID, self.ObjDetectSensorMiddle, sim.simx_opmode_streaming)
+        _, _, _, _, _ = sim.simxReadProximitySensor(self.clientID, self.ObjDetectSensorRight, sim.simx_opmode_streaming)
+        _, _, _, _, _ = sim.simxReadProximitySensor(self.clientID, self.LeftBackSensor, sim.simx_opmode_streaming)
+        _, _, _, _, _ = sim.simxReadProximitySensor(self.clientID, self.RightBackSensor, sim.simx_opmode_streaming)
+
     def get_object_detection_sensor_data(self):
         """
             (left, middle, right)
         """
-        leftReturnCode, leftDetectionState, leftDetectedPoint, leftDetectedObjectHandle, leftDetectedSurfaceNormalVector = sim.simxReadProximitySensor(self.clientID, self.ObjDetectSensorLeft, sim.simx_opmode_streaming)
-        middleReturnCode, middleDetectionState, middleDetectedPoint, middleDetectedObjectHandle, middleDetectedSurfaceNormalVector = sim.simxReadProximitySensor(self.clientID, self.ObjDetectSensorMiddle, sim.simx_opmode_streaming)
-        rightReturnCode, rightDetectionState, rightDetectedPoint, rightDetectedObjectHandle, rightDetectedSurfaceNormalVector = sim.simxReadProximitySensor(self.clientID, self.ObjDetectSensorRight, sim.simx_opmode_streaming)
+        leftReturnCode, leftDetectionState, leftDetectedPoint, leftDetectedObjectHandle, leftDetectedSurfaceNormalVector = sim.simxReadProximitySensor(self.clientID, self.ObjDetectSensorLeft, sim.simx_opmode_buffer)
+        middleReturnCode, middleDetectionState, middleDetectedPoint, middleDetectedObjectHandle, middleDetectedSurfaceNormalVector = sim.simxReadProximitySensor(self.clientID, self.ObjDetectSensorMiddle, sim.simx_opmode_buffer)
+        rightReturnCode, rightDetectionState, rightDetectedPoint, rightDetectedObjectHandle, rightDetectedSurfaceNormalVector = sim.simxReadProximitySensor(self.clientID, self.ObjDetectSensorRight, sim.simx_opmode_buffer)
         #print("ObjDetection: Left=" + str(leftDetectionState) + ", Middle=" + str(middleDetectionState) + ", Right=" + str(rightDetectionState))
         #print(leftDetectedPoint, middleDetectedPoint, rightDetectedPoint)
         return leftDetectionState, middleDetectionState, rightDetectionState, leftDetectedPoint, middleDetectedPoint, rightDetectedPoint
+
+    def get_laser_data(self):
+        _, right_back_detection_state, right_back_detected_point, _, _ = sim.simxReadProximitySensor(self.clientID, self.RightBackSensor, sim.simx_opmode_buffer)
+        _, left_back_detection_state, left_back_detected_point, _, _ = sim.simxReadProximitySensor(self.clientID, self.LeftBackSensor, sim.simx_opmode_buffer)
+        return left_back_detection_state, left_back_detected_point, right_back_detection_state, right_back_detected_point
 
     def __to_360(self, degree):
         if degree < 0:
