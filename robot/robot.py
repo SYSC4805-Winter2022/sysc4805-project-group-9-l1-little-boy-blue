@@ -26,24 +26,30 @@ import math
 import enum
 
 class Direction(enum.Enum):
+    """
+        World direction
+    """
     North = 0
     East = 270
     South = 180
     West = 90
 
 class State(enum.Enum):
+    """
+        Robot state
+    """
     Beginning = 1
     Pathing = 2
     End = 3
 
 class Robot:
 
-    DEGREE_DIFFERENCE = 3
-    BACKING_DISPLACEMENT = -0.02
-    FORWARD_DISPLACEMENT = 0.7
-    MOVE_STRAIGHT_SPEED = 1.2
-    AVOID_OBJECT_DISPLACEMENT = 1
-    TUNRING_SPEED = 0.1
+    DEGREE_DIFFERENCE = 3 # degree tolerance
+    BACKING_DISPLACEMENT = -0.02 # move back distance
+    FORWARD_DISPLACEMENT = 0.7 # move forward distance
+    MOVE_STRAIGHT_SPEED = 1.2 # moving speed
+    AVOID_OBJECT_DISPLACEMENT = 1 # avoid object distance
+    TUNRING_SPEED = 0.1 # turn speed
 
     def __init__(self, clientID) -> None:
         self.clientID = clientID
@@ -69,17 +75,10 @@ class Robot:
 
     def start(self):
         """
-            write your code here!
+            Run the robot
         """
         self.init_sensors()
         self.extend_plow()
-        # self.retract_plow()
-        # self.extend_barrier()
-        # self.retract_barrier()
-        # self.plow_up()
-        # self.plow_down()
-        # self.plow_extend()
-        # self.plow_retract()
         while not self.is_plow_(extended=True):
             continue
         self.move_to(y=1)
@@ -145,8 +144,7 @@ class Robot:
 
     def avoid_object(self):
         """
-            TODO: what if blackline is detected?
-            TODO: go back to nav point
+            Avoid an object
         """
         init_position = self.get_position()
         is_detected = True
@@ -228,6 +226,22 @@ class Robot:
     def move_to(self, x=None, y=None):
         """
             current x and y position +/- x and +/- y
+            North: +x -> move forward
+                   -x -> move backward
+                   +y -> pass
+                   -y -> pass
+            South: +x -> move forward
+                   -x -> move backward
+                   +y -> pass
+                   -y -> pass
+            East:  +x -> pass
+                   -x -> pass
+                   +y -> move forward
+                   -y -> move backward
+            West:  +x -> pass
+                   -x -> pass
+                   +y -> move forward
+                   -y -> move backward
         """
         self.stop()
         if x is None and y is None:
@@ -269,6 +283,9 @@ class Robot:
         self.stop()
 
     def turn_to(self, degree):
+        """
+            Turn to a absolute (world) degree
+        """
         current_orientation = self.get_orientation()
         quadrant = current_orientation // 90
         if quadrant == 0 or quadrant == 1:
@@ -292,19 +309,22 @@ class Robot:
 
     def turn_left(self, relative_orientation):
         """
-            relative_orientation: the orientation the robot should be in after turning
+            Turn left relative to current orientation
         """
         degree = lambda current_orientation, relative_orientation: current_orientation + relative_orientation
         self.__turn(relative_orientation, degree, self.move_left)
 
     def turn_right(self, relative_orientation):
         """
-            relative_orientation: the orientation the robot should be in after turning
+            Turn right relative to current orientation
         """
         degree = lambda current_orientation, relative_orientation: current_orientation - relative_orientation
         self.__turn(relative_orientation, degree, self.move_right)
 
     def __turn(self, relative_orientation, calc_func, direction_func):
+        """
+            Abstract turn function
+        """
         current_orientation = self.get_orientation()
         self.stop()
         degree = calc_func(current_orientation, relative_orientation)
@@ -321,45 +341,71 @@ class Robot:
         print(inspect.stack()[1][3], self.get_orientation())
 
     def stop(self):
+        """
+            Stop the robot
+        """
         self.move_straight(0)
 
     def extend_plow(self):
-        sim.simxSetJointTargetPosition(self.clientID,self.PlowBaseJoint, 0.1,sim.simx_opmode_oneshot)
-        sim.simxSetJointTargetPosition(self.clientID,self.PlowLeftJoint, -0.2,sim.simx_opmode_oneshot)
-        sim.simxSetJointTargetPosition(self.clientID,self.PlowRightJoint, 0.2,sim.simx_opmode_oneshot)
-        sim.simxSetJointTargetPosition(self.clientID,self.PlowLeftBarrierJoint, 0.09,sim.simx_opmode_oneshot)
-        sim.simxSetJointTargetPosition(self.clientID,self.PlowRightBarrierJoint, 0.09, sim.simx_opmode_oneshot)
+        """
+            Fully extend the plow
+        """
+        self.plow_down()
+        self.plow_extend()
+        self.extend_barrier()
 
     def retract_plow(self):
-        sim.simxSetJointTargetPosition(self.clientID,self.PlowBaseJoint, 0,sim.simx_opmode_oneshot)
-        sim.simxSetJointTargetPosition(self.clientID,self.PlowLeftJoint, 0,sim.simx_opmode_oneshot)
-        sim.simxSetJointTargetPosition(self.clientID,self.PlowRightJoint, 0,sim.simx_opmode_oneshot)
-        sim.simxSetJointTargetPosition(self.clientID,self.PlowLeftBarrierJoint, 0,sim.simx_opmode_oneshot)
-        sim.simxSetJointTargetPosition(self.clientID,self.PlowRightBarrierJoint, 0,sim.simx_opmode_oneshot)
+        """
+            Fully retract the plow
+        """
+        self.plow_up()
+        self.plow_retract()
+        self.retract_barrier()
     
     def retract_barrier(self):
+        """
+            Retract the barrier
+        """
         sim.simxSetJointTargetPosition(self.clientID,self.PlowLeftBarrierJoint, 0,sim.simx_opmode_oneshot)
         sim.simxSetJointTargetPosition(self.clientID,self.PlowRightBarrierJoint, 0,sim.simx_opmode_oneshot)
 
     def extend_barrier(self):
-        sim.simxSetJointTargetPosition(self.clientID,self.PlowLeftBarrierJoint, 0.1,sim.simx_opmode_oneshot)
-        sim.simxSetJointTargetPosition(self.clientID,self.PlowRightBarrierJoint, 0.1,sim.simx_opmode_oneshot)
+        """
+            Extend the barrier
+        """
+        sim.simxSetJointTargetPosition(self.clientID,self.PlowLeftBarrierJoint, 0.09,sim.simx_opmode_oneshot)
+        sim.simxSetJointTargetPosition(self.clientID,self.PlowRightBarrierJoint, 0.09, sim.simx_opmode_oneshot)
 
     def plow_up(self):
+        """
+            Raise the plow
+        """
         sim.simxSetJointTargetPosition(self.clientID,self.PlowBaseJoint, 0,sim.simx_opmode_oneshot)
 
     def plow_down(self):
+        """
+            Lower the plow
+        """
         sim.simxSetJointTargetPosition(self.clientID,self.PlowBaseJoint, 0.1,sim.simx_opmode_oneshot)
 
     def plow_extend(self):
+        """
+            Extend the plow
+        """
         sim.simxSetJointTargetPosition(self.clientID,self.PlowLeftJoint, -0.2,sim.simx_opmode_oneshot)
         sim.simxSetJointTargetPosition(self.clientID,self.PlowRightJoint, 0.2,sim.simx_opmode_oneshot)
 
     def plow_retract(self):
+        """
+            Retract the plow
+        """
         sim.simxSetJointTargetPosition(self.clientID,self.PlowLeftJoint, 0,sim.simx_opmode_oneshot)
         sim.simxSetJointTargetPosition(self.clientID,self.PlowRightJoint, 0,sim.simx_opmode_oneshot)
 
     def is_plow_(self, extended=False, retracted=False):
+        """
+            Check if the plow is in the desired state
+        """
         returnCode, position = sim.simxGetJointPosition(self.clientID,self.PlowRightJoint,sim.simx_opmode_blocking)
         position = round(position, 1)
         if extended:
@@ -370,7 +416,7 @@ class Robot:
 
     def move_back(self, velocity):
         """
-            the velocity in m/s
+            Move back
         """
         velocity *= 10
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.LeftMotor,-velocity,sim.simx_opmode_blocking)
@@ -380,9 +426,7 @@ class Robot:
 
     def move_straight(self, velocity):
         """
-            the diameter of the wheel is 0.2m
-            maximum 2 m/s = 1146.4968152866 degrees/s
-            the velocity in m/s
+            Move forward
         """
         velocity *= 10
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.LeftMotor,velocity,sim.simx_opmode_oneshot)
@@ -392,7 +436,7 @@ class Robot:
 
     def move_right(self, velocity):
         """
-            the velocity in m/s
+            Turn right
         """
         velocity *= 10
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.LeftMotor,velocity,sim.simx_opmode_oneshot)
@@ -402,7 +446,7 @@ class Robot:
     
     def move_left(self, velocity):
         """
-            the velocity in m/s
+            Turn left
         """
         velocity *= 10
         returnCode = sim.simxSetJointTargetVelocity(self.clientID,self.LeftMotor,-velocity,sim.simx_opmode_oneshot)
@@ -412,46 +456,32 @@ class Robot:
 
     def get_orientation(self):
         """
-            roll (index 0): dont look at it
-            pitch (index 1): the orientation of the robot
-                   around 90: front
-                   around 270: back
-                   around 180: left
-                   around 0: right
-            yaw (index 2): dont look at it
+            Get the orientation of the robot in absolute (world) degree
         """
         returnCode, euler = sim.simxGetObjectOrientation(self.clientID,self.RobotBody,-1,sim.simx_opmode_blocking)
         _, __, degree = math.degrees(euler[0]), math.degrees(euler[1]), math.degrees(euler[2])
-        # degree, _, __ = self.quaternionToYawPitchRoll(x, y, z, w)
         return self.__to_360(degree)
 
     def get_position(self):
         """
-            x (index 0)
-            y (index 1)
-            z (index 2): dont look at it
+            Get the position of the robot in the world
         """
         returnCode, position = sim.simxGetObjectPosition(self.clientID,self.RobotBody,-1,sim.simx_opmode_blocking)
         return (round(position[0], 5), round(position[1], 5))
 
-    def quaternionToYawPitchRoll(self, x, y, z, w):
-        roll = math.degrees(math.atan2(2*y*w - 2*x*z, 1 - 2*y*y - 2*z*z))
-        pitch = math.degrees(math.atan2(2*x*w - 2*y*z, 1 - 2*x*x - 2*z*z))
-        yaw = math.degrees(math.asin(2*x*y + 2*z*w))
-
-        return round(yaw, 1), round(pitch, 1), round(roll, 1)
-
     def get_line_following_sensor_data(self):
         """
-            (left, middle, right)
+            Detect the black line
         """
-        #leftReturnCode, leftDetectionState, auxPackets = sim.simxReadVisionSensor(self.clientID, self.LineDetectSensorLeft, sim.simx_opmode_blocking)
+        leftReturnCode, leftDetectionState, leftAuxPackets = sim.simxReadVisionSensor(self.clientID, self.LineDetectSensorLeft, sim.simx_opmode_blocking)
+        rightReturnCode, rightDetectionState, rightAuxPackets= sim.simxReadVisionSensor(self.clientID, self.LineDetectSensorRight, sim.simx_opmode_blocking)
         middleReturnCode, middleDetectionState, auxPackets = sim.simxReadVisionSensor(self.clientID, self.LineDetectSensorMiddle, sim.simx_opmode_streaming)
-        #rightReturnCode, rightDetectionState, auxPackets= sim.simxReadVisionSensor(self.clientID, self.LineDetectSensorRight, sim.simx_opmode_blocking)
-        #print("LineDetection: Left=" + str(leftDetectionState) + ", Middle=" + str(middleDetectionState) + ", Right=" + str(rightDetectionState))
         return middleReturnCode, middleDetectionState, auxPackets
 
     def init_sensors(self):
+        """
+            Initialize the sensors
+        """
         _, _, _, _, _ = sim.simxReadProximitySensor(self.clientID, self.ObjDetectSensorLeft, sim.simx_opmode_streaming)
         _, _, _, _, _ = sim.simxReadProximitySensor(self.clientID, self.ObjDetectSensorMiddle, sim.simx_opmode_streaming)
         _, _, _, _, _ = sim.simxReadProximitySensor(self.clientID, self.ObjDetectSensorRight, sim.simx_opmode_streaming)
@@ -460,21 +490,25 @@ class Robot:
 
     def get_object_detection_sensor_data(self):
         """
-            (left, middle, right)
+            Detect obstacles using ultrasonic sensors
         """
         leftReturnCode, leftDetectionState, leftDetectedPoint, leftDetectedObjectHandle, leftDetectedSurfaceNormalVector = sim.simxReadProximitySensor(self.clientID, self.ObjDetectSensorLeft, sim.simx_opmode_buffer)
         middleReturnCode, middleDetectionState, middleDetectedPoint, middleDetectedObjectHandle, middleDetectedSurfaceNormalVector = sim.simxReadProximitySensor(self.clientID, self.ObjDetectSensorMiddle, sim.simx_opmode_buffer)
         rightReturnCode, rightDetectionState, rightDetectedPoint, rightDetectedObjectHandle, rightDetectedSurfaceNormalVector = sim.simxReadProximitySensor(self.clientID, self.ObjDetectSensorRight, sim.simx_opmode_buffer)
-        #print("ObjDetection: Left=" + str(leftDetectionState) + ", Middle=" + str(middleDetectionState) + ", Right=" + str(rightDetectionState))
-        #print(leftDetectedPoint, middleDetectedPoint, rightDetectedPoint)
         return leftDetectionState, middleDetectionState, rightDetectionState, leftDetectedPoint, middleDetectedPoint, rightDetectedPoint
 
     def get_laser_data(self):
+        """
+            Detect obstacles using laser sensors
+        """
         _, right_back_detection_state, right_back_detected_point, _, _ = sim.simxReadProximitySensor(self.clientID, self.RightBackSensor, sim.simx_opmode_buffer)
         _, left_back_detection_state, left_back_detected_point, _, _ = sim.simxReadProximitySensor(self.clientID, self.LeftBackSensor, sim.simx_opmode_buffer)
         return left_back_detection_state, left_back_detected_point, right_back_detection_state, right_back_detected_point
 
     def __to_360(self, degree):
+        """
+            Convert degrees (-180 - 180) to (0 - 360)
+        """
         if degree < 0:
             degree += 360
         elif degree > 360:

@@ -1,0 +1,8 @@
+Preconditions:
+1. Python Environment
+2. The start line of the robot needs to be black instead of white
+
+Step:
+1. Select `Files -> Load model...` and navigate to the directory where `robot.ttm` is.
+2. Click `Start Simlulation` in CoppeliaSim
+3. Run `python robot.py` in the terminal in the directory of `robot.py`
