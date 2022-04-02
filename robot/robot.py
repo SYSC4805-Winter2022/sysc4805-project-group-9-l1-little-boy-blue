@@ -90,6 +90,7 @@ class Robot:
             # print(self.get_position())
             _, middleDetectionState, _, _, _, _ = self.get_object_detection_sensor_data()
             if middleDetectionState:
+                self.stop()
                 print("Object detected")
                 self.avoid_object()
             self.move_straight(self.MOVE_STRAIGHT_SPEED)
@@ -155,12 +156,14 @@ class Robot:
         while is_detected:
             self.move_straight(self.MOVE_STRAIGHT_SPEED)
             leftDetectedState, _, rightDetectedState, leftDetectedPoint, _, rightDetectedPoint = self.get_object_detection_sensor_data()
-            if (round(rightDetectedPoint[2], 1) == 0 and not rightDetectedState) and (round(leftDetectedPoint[2], 1) == 0 and not leftDetectedState):
+            left_back_detection_state, _, right_back_detection_state, _ = self.get_laser_data()
+            if (round(rightDetectedPoint[2], 1) == 0 and not rightDetectedState and not right_back_detection_state) and (round(leftDetectedPoint[2], 1) == 0 and not leftDetectedState and not left_back_detection_state):
+                self.stop()
                 is_detected = False
                 avoided_position = self.get_position()
                 print("Object avoided")
-        # self.turn_to(self.currDir.value)
-        # self.move_straight(self.MOVE_STRAIGHT_SPEED)
+        self.turn_to(self.currDir.value)
+        self.move_straight(self.MOVE_STRAIGHT_SPEED)
         # _x = init_position[0] - avoided_position[0]
         # _y = init_position[1] - avoided_position[1]
         # if -0.5 < _x < 0.5:
@@ -168,7 +171,7 @@ class Robot:
         # if -0.5 < _y < 0.5:
         #     _y = 0
         # delta_position = (_x, _y)
-        self.navigate_back(init_position, avoided_position)
+        # self.navigate_back(init_position, avoided_position)
 
     def navigate_back(self, initial_pos, avoided_pos):
         """
